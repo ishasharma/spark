@@ -36,7 +36,8 @@ abstract class Estimator[M <: Model[M]] extends PipelineStage with Params {
    * Fits a single model to the input data with optional parameters.
    *
    * @param dataset input dataset
-   * @param paramPairs optional list of param pairs (overwrite embedded params)
+   * @param paramPairs Optional list of param pairs.
+   *                   These values override any specified in this Estimator's embedded ParamMap.
    * @return fitted model
    */
   @varargs
@@ -49,7 +50,8 @@ abstract class Estimator[M <: Model[M]] extends PipelineStage with Params {
    * Fits a single model to the input data with provided parameter map.
    *
    * @param dataset input dataset
-   * @param paramMap parameter map
+   * @param paramMap Parameter map.
+   *                 These values override any specified in this Estimator's embedded ParamMap.
    * @return fitted model
    */
   def fit(dataset: SchemaRDD, paramMap: ParamMap): M
@@ -60,7 +62,8 @@ abstract class Estimator[M <: Model[M]] extends PipelineStage with Params {
    * Subclasses could overwrite this to optimize multi-model training.
    *
    * @param dataset input dataset
-   * @param paramMaps an array of parameter maps
+   * @param paramMaps An array of parameter maps.
+   *                  These values override any specified in this Estimator's embedded ParamMap.
    * @return fitted models, matching the input parameter maps
    */
   def fit(dataset: SchemaRDD, paramMaps: Array[ParamMap]): Seq[M] = {
@@ -73,7 +76,8 @@ abstract class Estimator[M <: Model[M]] extends PipelineStage with Params {
    * Fits a single model to the input data with optional parameters.
    *
    * @param dataset input dataset
-   * @param paramPairs optional list of param pairs (overwrite embedded params)
+   * @param paramPairs Optional list of param pairs.
+   *                   These values override any specified in this Estimator's embedded ParamMap.
    * @return fitted model
    */
   @varargs
@@ -85,7 +89,8 @@ abstract class Estimator[M <: Model[M]] extends PipelineStage with Params {
    * Fits a single model to the  input data with provided parameter map.
    *
    * @param dataset input dataset
-   * @param paramMap parameter map
+   * @param paramMap Parameter map.
+   *                 These values override any specified in this Estimator's embedded ParamMap.
    * @return fitted model
    */
   def fit(dataset: JavaSchemaRDD, paramMap: ParamMap): M = {
@@ -96,7 +101,8 @@ abstract class Estimator[M <: Model[M]] extends PipelineStage with Params {
    * Fits multiple models to the input data with multiple sets of parameters.
    *
    * @param dataset input dataset
-   * @param paramMaps an array of parameter maps
+   * @param paramMaps An array of parameter maps.
+   *                  These values override any specified in this Estimator's embedded ParamMap.
    * @return fitted models, matching the input parameter maps
    */
   def fit(dataset: JavaSchemaRDD, paramMaps: Array[ParamMap]): java.util.List[M] = {
