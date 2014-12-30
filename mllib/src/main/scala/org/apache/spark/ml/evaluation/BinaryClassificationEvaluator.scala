@@ -26,6 +26,7 @@ import org.apache.spark.sql.{DoubleType, Row, SchemaRDD}
 
 /**
  * :: AlphaComponent ::
+ *
  * Evaluator for binary classification, which expects two input columns: score and label.
  */
 @AlphaComponent
