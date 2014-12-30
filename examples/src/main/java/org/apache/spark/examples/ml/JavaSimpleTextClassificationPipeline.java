@@ -84,9 +84,9 @@ public class JavaSimpleTextClassificationPipeline {
 
     // Make predictions on test documents.
     model.transform(test).registerAsTable("prediction");
-    JavaSchemaRDD predictions = jsql.sql("SELECT id, text, score, prediction FROM prediction");
+    JavaSchemaRDD predictions = jsql.sql("SELECT id, text, probability, prediction FROM prediction");
     for (Row r: predictions.collect()) {
-      System.out.println("(" + r.get(0) + ", " + r.get(1) + ") --> score=" + r.get(2)
+      System.out.println("(" + r.get(0) + ", " + r.get(1) + ") --> prob=" + r.get(2)
           + ", prediction=" + r.get(3));
     }
   }

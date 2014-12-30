@@ -91,7 +91,7 @@ sealed trait Vector extends Serializable {
  * User-defined type for [[Vector]] which allows easy interaction with SQL
  * via [[org.apache.spark.sql.SchemaRDD]].
  */
-private[spark] class VectorUDT extends UserDefinedType[Vector] {
+class VectorUDT extends UserDefinedType[Vector] {
 
   override def sqlType: StructType = {
     // type: 0 = sparse, 1 = dense
@@ -147,6 +147,13 @@ private[spark] class VectorUDT extends UserDefinedType[Vector] {
   override def pyUDT: String = "pyspark.mllib.linalg.VectorUDT"
 
   override def userClass: Class[Vector] = classOf[Vector]
+
+  override def equals(o: Any): Boolean = {
+    o match {
+      case v: VectorUDT => true
+      case _ => false
+    }
+  }
 }
 
 /**
