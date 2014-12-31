@@ -66,7 +66,7 @@ public class JavaPipelineSuite {
       .setStages(new PipelineStage[] {scaler, lr});
     PipelineModel model = pipeline.fit(dataset);
     model.transform(dataset).registerTempTable("prediction");
-    JavaSchemaRDD predictions = jsql.sql("SELECT label, score, prediction FROM prediction");
+    JavaSchemaRDD predictions = jsql.sql("SELECT label, probability, prediction FROM prediction");
     predictions.collect();
   }
 }

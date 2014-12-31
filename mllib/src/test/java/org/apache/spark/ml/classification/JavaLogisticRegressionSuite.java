@@ -34,7 +34,7 @@ import org.apache.spark.api.java.function.Function;
 import static org.apache.spark.mllib.classification.LogisticRegressionSuite
     .generateLogisticInputAsList;
 import org.apache.spark.mllib.linalg.Vector;
-import org.apache.spark.ml.LabeledPoint;
+import org.apache.spark.mllib.regression.LabeledPoint;
 import org.apache.spark.sql.api.java.JavaSQLContext;
 import org.apache.spark.sql.api.java.JavaSchemaRDD;
 import org.apache.spark.sql.api.java.Row;
@@ -78,13 +78,13 @@ public class JavaLogisticRegressionSuite implements Serializable {
     assert(lr.getLabelCol().equals("label"));
     LogisticRegressionModel model = lr.fit(dataset);
     model.transform(dataset).registerTempTable("prediction");
-    JavaSchemaRDD predictions = jsql.sql("SELECT label, score, prediction FROM prediction");
+    JavaSchemaRDD predictions = jsql.sql("SELECT label, probability, prediction FROM prediction");
     predictions.collect();
     // Check defaults
     assert(model.getThreshold() == 0.5);
     assert(model.getFeaturesCol().equals("features"));
     assert(model.getPredictionCol().equals("prediction"));
-    assert(model.getScoreCol().equals("score"));
+    assert(model.getProbabilityCol().equals("probability"));
   }
 
   @Test
@@ -94,22 +94,22 @@ public class JavaLogisticRegressionSuite implements Serializable {
       .setMaxIter(10)
       .setRegParam(1.0)
       .setThreshold(0.6)
-      .setScoreCol("probability");
+      .setProbabilityCol("myProbability");
     LogisticRegressionModel model = lr.fit(dataset);
-    assert(model.fittingParamMap().get(lr.maxIter()).get() == 10);
-    assert(model.fittingParamMap().get(lr.regParam()).get() == 1.0);
-    assert(model.fittingParamMap().get(lr.threshold()).get() == 0.6);
+    assert(model.fittingParamMap().apply(lr.maxIter()) == 10);
+    assert(model.fittingParamMap().apply(lr.regParam()).equals(1.0));
+    assert(model.fittingParamMap().apply(lr.threshold()).equals(0.6));
     assert(model.getThreshold() == 0.6);
 
     // Modify model params, and check that the params worked.
     model.setThreshold(1.0);
     model.transform(dataset).registerTempTable("predAllZero");
-    JavaSchemaRDD predAllZero = jsql.sql("SELECT prediction, probability FROM predAllZero");
+    JavaSchemaRDD predAllZero = jsql.sql("SELECT prediction, myProbability FROM predAllZero");
     for (Row r: predAllZero.collect()) {
       assert(r.getDouble(0) == 0.0);
     }
     // Call transform with params, and check that the params worked.
-    model.transform(dataset, model.threshold().w(0.0), model.scoreCol().w("myProb"))
+    model.transform(dataset, model.threshold().w(0.0), model.probabilityCol().w("myProb"))
       .registerTempTable("predNotAllZero");
     JavaSchemaRDD predNotAllZero = jsql.sql("SELECT prediction, myProb FROM predNotAllZero");
     boolean foundNonZero = false;
@@ -120,54 +120,38 @@ public class JavaLogisticRegressionSuite implements Serializable {
 
     // Call fit() with new params, and check as many params as we can.
     LogisticRegressionModel model2 = lr.fit(dataset, lr.maxIter().w(5), lr.regParam().w(0.1),
-        lr.threshold().w(0.4), lr.scoreCol().w("theProb"));
-    assert(model2.fittingParamMap().get(lr.maxIter()).get() == 5);
-    assert(model2.fittingParamMap().get(lr.regParam()).get() == 0.1);
-    assert(model2.fittingParamMap().get(lr.threshold()).get() == 0.4);
+        lr.threshold().w(0.4), lr.probabilityCol().w("theProb"));
+    assert(model2.fittingParamMap().apply(lr.maxIter()) == 5);
+    assert(model2.fittingParamMap().apply(lr.regParam()).equals(0.1));
+    assert(model2.fittingParamMap().apply(lr.threshold()).equals(0.4));
     assert(model2.getThreshold() == 0.4);
-    assert(model2.getScoreCol().equals("theProb"));
+    assert(model2.getProbabilityCol().equals("theProb"));
   }
 
+  @SuppressWarnings("unchecked")
   @Test
   public void logisticRegressionPredictorClassifierMethods() {
     LogisticRegression lr = new LogisticRegression();
 
-    // fit() vs. train()
-    LogisticRegressionModel model1 = lr.fit(dataset);
-    LogisticRegressionModel model2 = lr.train(datasetRDD);
-    assert(model1.intercept() == model2.intercept());
-    assert(model1.weights().equals(model2.weights()));
-    assert(model1.numClasses() == model2.numClasses());
-    assert(model1.numClasses() == 2);
+    LogisticRegressionModel model = lr.fit(dataset);
+    assert(model.numClasses() == 2);
 
-    // transform() vs. predict()
-    model1.transform(dataset).registerTempTable("transformed");
-    JavaSchemaRDD trans = jsql.sql("SELECT prediction FROM transformed");
-    JavaRDD<Double> preds = model1.predict(featuresRDD);
-    for (scala.Tuple2<Row, Double> trans_pred: trans.zip(preds).collect()) {
-      double t = trans_pred._1().getDouble(0);
-      double p = trans_pred._2();
-      assert(t == p);
+    model.transform(dataset).registerTempTable("transformed");
+    JavaSchemaRDD trans1 = jsql.sql("SELECT rawPrediction, probability FROM transformed");
+    for (Row row: trans1.collect()) {
+      Vector raw = (Vector)row.get(0);
+      Vector prob = (Vector)row.get(1);
+      assert(raw.size() == 2);
+      assert(prob.size() == 2);
+      double probFromRaw1 = 1.0 / (1.0 + Math.exp(-raw.apply(1)));
+      assert(Math.abs(prob.apply(1) - probFromRaw1) < eps);
+      assert(Math.abs(prob.apply(0) - (1.0 - probFromRaw1)) < eps);
     }
 
-    // Check various types of predictions.
-    JavaRDD<Vector> rawPredictions = model1.predictRaw(featuresRDD);
-    JavaRDD<Vector> probabilities = model1.predictProbabilities(featuresRDD);
-    JavaRDD<Double> predictions = model1.predict(featuresRDD);
-    double threshold = model1.getThreshold();
-    for (Tuple2<Vector, Vector> raw_prob: rawPredictions.zip(probabilities).collect()) {
-      Vector raw = raw_prob._1();
-      Vector prob = raw_prob._2();
-      for (int i = 0; i < raw.size(); ++i) {
-        double r = raw.apply(i);
-        double p = prob.apply(i);
-        double pFromR = 1.0 / (1.0 + Math.exp(-r));
-        assert(Math.abs(r - pFromR) < eps);
-      }
-    }
-    for (Tuple2<Vector, Double> prob_pred: probabilities.zip(predictions).collect()) {
-      Vector prob = prob_pred._1();
-      double pred = prob_pred._2();
+    JavaSchemaRDD trans2 = jsql.sql("SELECT prediction, probability FROM transformed");
+    for (Row row: trans2.collect()) {
+      double pred = row.getDouble(0);
+      Vector prob = (Vector)row.get(1);
       double probOfPred = prob.apply((int)pred);
       for (int i = 0; i < prob.size(); ++i) {
         assert(probOfPred >= prob.apply(i));
